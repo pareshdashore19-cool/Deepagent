@@ -1,0 +1,18 @@
+[project]
+name = "card-customer-assist"
+version = "0.1.0"
+description = "A credit card support chatbot configured through files on disk"
+requires-python = ">=3.11"
+dependencies = [
+    "deepagents>=0.6.12",
+    "langchain-anthropic>=0.3.0",
+    "langgraph-checkpoint-sqlite>=3.1.0",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+]
+
+[dependency-groups]
+dev = []
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
