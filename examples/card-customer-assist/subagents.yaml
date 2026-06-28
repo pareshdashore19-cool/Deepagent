@@ -8,7 +8,6 @@ spending-analyst:
     spending", "am I spending more than usual"). Delegate the analysis question and
     it will pull transactions and return a tidy summary. Do NOT use it for a simple
     "show my recent transactions" request — handle that yourself.
-  model: anthropic:claude-haiku-4-5-20251001
   system_prompt: |
     You are a spending analyst for a credit card customer. You have a read-only
     `list_transactions` tool. You CANNOT make payments or change anything.

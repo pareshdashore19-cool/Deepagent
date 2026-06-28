@@ -37,9 +37,11 @@ from typing import Optional
 
 import yaml
 from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.types import Command
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -389,6 +391,46 @@ def load_subagents(config_path: Path) -> list:
     return subagents
 
 
+def build_model() -> BaseChatModel:
+    """Return the chat model the agent runs on — the single place to swap LLM backends.
+
+    deepagents needs a full chat-model object (it binds tools, streams, and loops over
+    many turns), so this returns a LangChain `BaseChatModel`, not a one-shot invoke fn.
+
+    Backend is chosen by the CARD_LLM_PROVIDER env var:
+
+    - "anthropic" (default): Claude, for developing/testing now.
+    - "oss": your GPT-OSS model on Kubernetes, served behind an OpenAI-compatible
+      /v1/chat/completions endpoint (vLLM, TGI, etc.). Configure via env:
+          CARD_LLM_PROVIDER=oss
+          CARD_LLM_BASE_URL=http://<your-cluster-service>/v1
+          CARD_LLM_MODEL=gpt-oss-120b
+          CARD_LLM_API_KEY=<token or any non-empty string>
+      Requires `uv add langchain-openai`. The model MUST support tool calling — this
+      agent relies on tools and on the `task` tool for subagents.
+    """
+    provider = os.environ.get("CARD_LLM_PROVIDER", "anthropic").lower()
+
+    if provider == "anthropic":
+        return ChatAnthropic(model_name="claude-sonnet-4-6")
+
+    if provider == "oss":
+        # Lazy import so langchain-openai is only needed when you actually use this path.
+        from langchain_openai import ChatOpenAI
+
+        # Same call as the raw OpenAI SDK against vLLM:
+        #     OpenAI(base_url=..., api_key="EMPTY").chat.completions.create(model=..., ...)
+        # ChatOpenAI just wraps that and adds tool-calling/streaming the agent needs.
+        return ChatOpenAI(
+            model=os.environ.get("CARD_LLM_MODEL", "meta-llama/Llama-3.1-8B-Instruct"),  # must match served name
+            base_url=os.environ.get("CARD_LLM_BASE_URL", "http://localhost:8000/v1"),
+            api_key=os.environ.get("CARD_LLM_API_KEY", "EMPTY"),  # vLLM ignores it; any non-empty string
+            temperature=0,  # 0 for reliable tool calling; override if you like
+        )
+
+    raise ValueError(f"Unknown CARD_LLM_PROVIDER={provider!r}. Use 'anthropic' or 'oss'.")
+
+
 def create_card_assistant(checkpointer):
     """Create the credit card support agent, configured by files on disk.
 
@@ -397,7 +439,7 @@ def create_card_assistant(checkpointer):
     database-backed checkpointer, across process restarts.
     """
     return create_deep_agent(
-        model=ChatAnthropic(model_name="claude-sonnet-4-6"),
+        model=build_model(),
         memory=["./AGENTS.md"],                                  # persona + security rules
         skills=["./skills/"],                                    # make-payment, view-transactions
         tools=[                                                  # the mock bank backend
@@ -414,6 +456,9 @@ def create_card_assistant(checkpointer):
         subagents=load_subagents(EXAMPLE_DIR / "subagents.yaml"),  # spending-analyst
         backend=FilesystemBackend(root_dir=EXAMPLE_DIR, virtual_mode=False),
         checkpointer=checkpointer,                               # persist chat across turns
+        # Hard gate: pause BEFORE make_payment runs and require explicit human
+        # authorization. The agent cannot move money without a resume decision.
+        interrupt_on={"make_payment": True},
     )
 
 
@@ -450,18 +495,76 @@ def print_message(msg) -> None:
             console.print(f"  {tag}")
 
 
+def format_payment_disclosure(args: dict) -> str:
+    """Build the canonical pre-payment disclosure from the PENDING make_payment args.
+
+    The figures come straight from the tool call that is about to execute (carried in
+    the interrupt payload), so what the customer authorizes is exactly what will be
+    charged — the wording is owned here in code, never paraphrased by the model.
+    """
+    card = next((c for c in PAYABLE_CARDS[CURRENT_CUSTOMER] if c["id"] == args.get("card_id")), None)
+    method = next((m for m in PAYMENT_METHODS[CURRENT_CUSTOMER] if m["id"] == args.get("payment_method_id")), None)
+    amount = args.get("amount")
+
+    card_label = f"{card['issuer']} ••{card['last4']}" if card else str(args.get("card_id", "?"))
+    method_label = f"{method['nickname']} ••{method['bank_last4']}" if method else str(args.get("payment_method_id", "?"))
+    amount_label = f"${amount:,.2f}" if isinstance(amount, (int, float)) else str(amount)
+
+    return (
+        "**Please review and authorize this payment.**\n\n"
+        f"- **Amount:** {amount_label}\n"
+        f"- **To card:** {card_label}\n"
+        f"- **From account:** {method_label}\n"
+        f"- **Date:** {args.get('payment_date', '?')}\n\n"
+        "By authorizing, you instruct Northwind Bank to debit the amount above from the "
+        "selected account on the date shown. Once submitted, the payment may not be "
+        "reversible through this assistant.\n\n"
+        "_Reply **yes** to authorize, or anything else to cancel._"
+    )
+
+
+def review_payment(args: dict) -> dict:
+    """Show the disclosure for one pending payment and return the human's decision.
+
+    Returns a HumanInTheLoopMiddleware decision: approve runs the tool, reject skips it.
+    """
+    console.print(Panel(Markdown(format_payment_disclosure(args)),
+                        title="Payment Authorization", border_style="red"))
+    answer = console.input("[bold red]Authorize this payment? type 'yes':[/] ").strip().lower()
+    if answer in {"yes", "y"}:
+        return {"type": "approve"}
+    return {"type": "reject", "message": "The customer did not authorize this payment."}
+
+
 async def run_turn(agent, text: str, thread_id: str, printed_count: int) -> int:
-    """Stream one user turn, printing only newly-produced messages."""
-    async for chunk in agent.astream(
-        {"messages": [("user", text)]},
-        config={"configurable": {"thread_id": thread_id}},
-        stream_mode="values",
-    ):
-        messages = chunk.get("messages", [])
-        for msg in messages[printed_count:]:
-            print_message(msg)
-        printed_count = max(printed_count, len(messages))
-    return printed_count
+    """Stream one user turn, pausing for explicit authorization before any payment.
+
+    If the agent tries to call make_payment, the graph interrupts before the tool
+    runs; we surface the disclosure, collect the customer's decision, and resume.
+    """
+    config = {"configurable": {"thread_id": thread_id}}
+    payload = {"messages": [("user", text)]}
+
+    while True:
+        async for chunk in agent.astream(payload, config=config, stream_mode="values"):
+            messages = chunk.get("messages", [])
+            for msg in messages[printed_count:]:
+                print_message(msg)
+            printed_count = max(printed_count, len(messages))
+
+        # Did the agent pause for human approval (the make_payment gate)?
+        state = await agent.aget_state(config)
+        if not state.interrupts:
+            return printed_count
+
+        # One decision per pending action, in order. Payments are gated by the
+        # disclosure; any other interrupting tool is approved by default.
+        request = state.interrupts[0].value
+        decisions = [
+            review_payment(action["args"]) if action["name"] == "make_payment" else {"type": "approve"}
+            for action in request["action_requests"]
+        ]
+        payload = Command(resume={"decisions": decisions})
 
 
 async def main() -> None:
