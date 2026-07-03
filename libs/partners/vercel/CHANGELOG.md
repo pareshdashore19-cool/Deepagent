@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.2](https://github.com/pareshdashore19-cool/Deepagent/compare/langchain-vercel-sandbox==0.0.1...langchain-vercel-sandbox==0.0.2) (2026-07-03)
+
+
+### Features
+
+* **vercel:** add Vercel Sandbox provider ([#3588](https://github.com/pareshdashore19-cool/Deepagent/issues/3588)) ([e5e4748](https://github.com/pareshdashore19-cool/Deepagent/commit/e5e4748cb6c66ddaa9444ab464990c1a5d10854d))
+
 ## 0.0.1 (2026-06-13)
 
 ### Features
