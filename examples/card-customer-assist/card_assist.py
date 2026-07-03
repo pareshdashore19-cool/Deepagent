@@ -81,10 +81,14 @@ ACCOUNTS = {
 # make-payment flow asks which of these to pay; the amount options come from here too.
 PAYABLE_CARDS = {
     "cust_001": [
+        # Chase: no autopay, no pending payment — a manual payment is allowed.
         {"id": "card_chase", "issuer": "Chase", "last4": "1234",
-         "current_balance": 2347.65, "statement_balance": 2105.40, "minimum_due": 75.00, "due_date": "2026-07-15"},
+         "current_balance": 2347.65, "statement_balance": 2105.40, "minimum_due": 75.00, "due_date": "2026-07-15",
+         "autopay_enabled": False, "pending_payment": False},
+        # Discover: autopay is on — a manual payment is blocked until it posts.
         {"id": "card_discover", "issuer": "Discover", "last4": "3456",
-         "current_balance": 980.12, "statement_balance": 980.12, "minimum_due": 35.00, "due_date": "2026-07-10"},
+         "current_balance": 980.12, "statement_balance": 980.12, "minimum_due": 35.00, "due_date": "2026-07-10",
+         "autopay_enabled": True, "pending_payment": False},
     ]
 }
 
@@ -159,6 +163,54 @@ def list_payable_cards() -> dict:
             for c in PAYABLE_CARDS[CURRENT_CUSTOMER]
         ]
     }
+
+
+@tool
+def check_payment_eligibility(card_id: str) -> dict:
+    """Check whether a card has autopay or a pending payment before paying it.
+
+    Call this RIGHT AFTER the customer picks which card to pay, BEFORE asking for a
+    funding account or amount. If the card has autopay turned on or a payment already
+    pending, a manual payment could double up — so WARN the customer and ask whether
+    they still want to proceed. If there's nothing flagged, just continue the flow.
+
+    Args:
+        card_id: Which card to check, from list_payable_cards (e.g. "card_chase").
+
+    Returns:
+        {"clear": True} when there's nothing flagged — proceed without asking, or
+        {"clear": False, "needs_confirmation": True, "reason": "autopay" | "pending_payment",
+         "warning": ...} with a customer-facing warning to confirm before proceeding.
+    """
+    cards = {c["id"]: c for c in PAYABLE_CARDS[CURRENT_CUSTOMER]}
+    if card_id not in cards:
+        return {"error": f"Unknown card {card_id!r}. Call list_payable_cards first."}
+    card = cards[card_id]
+    label = f"{card['issuer']} ••{card['last4']}"
+
+    if card.get("autopay_enabled"):
+        return {
+            "clear": False,
+            "needs_confirmation": True,
+            "reason": "autopay",
+            "warning": (
+                f"Your {label} card has autopay enabled, so a manual payment may post "
+                "on top of the autopay payment. Do you still want to proceed with a "
+                "manual payment?"
+            ),
+        }
+    if card.get("pending_payment"):
+        return {
+            "clear": False,
+            "needs_confirmation": True,
+            "reason": "pending_payment",
+            "warning": (
+                f"Your {label} card already has a payment pending, so a manual payment "
+                "may post on top of it. Do you still want to proceed with a manual "
+                "payment?"
+            ),
+        }
+    return {"clear": True}
 
 
 @tool
@@ -445,6 +497,7 @@ def create_card_assistant(checkpointer):
         tools=[                                                  # the mock bank backend
             get_card_summary,
             list_payable_cards,
+            check_payment_eligibility,
             get_payment_amount_options,
             list_transactions,
             get_transaction,
@@ -485,8 +538,9 @@ def print_message(msg) -> None:
                     f"  [bold yellow]>> paying ${args.get('amount', '?')} to {args.get('card_id', '?')} "
                     f"from {args.get('payment_method_id', '?')} on {args.get('payment_date', '?')}[/]"
                 )
-            elif name in ("get_card_summary", "list_payable_cards", "get_payment_amount_options",
-                          "list_transactions", "get_transaction", "list_payment_methods"):
+            elif name in ("get_card_summary", "list_payable_cards", "check_payment_eligibility",
+                          "get_payment_amount_options", "list_transactions", "get_transaction",
+                          "list_payment_methods"):
                 console.print(f"  [dim]>> {name}({', '.join(f'{k}={v!r}' for k, v in args.items())})[/]")
 
     elif isinstance(msg, ToolMessage):

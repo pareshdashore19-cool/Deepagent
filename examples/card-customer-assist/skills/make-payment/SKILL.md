@@ -32,6 +32,21 @@ Ask which card they'd like to pay. If they already named one, confirm you have t
 
 **Gate:** do not move to Step 2 until the customer has confirmed which card to pay.
 
+## Step 1.5 — Check for autopay or a pending payment
+
+As soon as the card is settled, call `check_payment_eligibility(card_id="<id>")` **before**
+asking for the funding account or amount.
+
+- If it returns `{"clear": True}`, there's nothing flagged — continue to Step 2.
+- If it returns `{"clear": False, "needs_confirmation": True, ...}`, the card has **autopay**
+  turned on or a **payment already pending**, so a manual payment could post on top of it.
+  Show the customer the `warning` from the result and ask whether they still want to proceed:
+  - If they say **yes**, continue to Step 2 as normal.
+  - If they say **no**, stop the payment flow for that card (offer another card if they have one).
+
+**Gate:** do not move to Step 2 until either the result was `clear: True`, or the customer
+explicitly confirmed they want to proceed despite the autopay/pending-payment warning.
+
 ## Step 2 — How they'd like to pay (the funding account)
 
 The customer pays **from** a bank account. Always **offer both paths together** so the
@@ -118,6 +133,7 @@ Then:
 ## Guardrails Recap
 
 - [ ] Customer chose the card from `list_payable_cards()`
+- [ ] `check_payment_eligibility()` was called; if it flagged autopay/pending, the customer confirmed they still want to proceed
 - [ ] Funding account is on file (via `list_payment_methods()`) or was added via the `add-bank-account` subagent
 - [ ] Amount is explicit and > $0 (and confirmed if it exceeds the balance)
 - [ ] Date is today–90 days out, given as `YYYY-MM-DD`
