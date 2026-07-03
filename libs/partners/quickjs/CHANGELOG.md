@@ -2,6 +2,34 @@
 
 # Changelog
 
+## [0.4.0](https://github.com/pareshdashore19-cool/Deepagent/compare/langchain-quickjs==0.3.2...langchain-quickjs==0.4.0) (2026-07-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **quickjs:** upgrade to 0.2.0 quickjs-rs ([#4067](https://github.com/pareshdashore19-cool/Deepagent/issues/4067))
+* **quickjs:** add default `subagent` bridge ([#3850](https://github.com/pareshdashore19-cool/Deepagent/issues/3850))
+* **quickjs:** remove `skills_backend` ([#3843](https://github.com/pareshdashore19-cool/Deepagent/issues/3843))
+
+### Features
+
+* **code,quickjs:** dynamic subagents UI ([#4221](https://github.com/pareshdashore19-cool/Deepagent/issues/4221)) ([10bcba2](https://github.com/pareshdashore19-cool/Deepagent/commit/10bcba25600e51aba135f170b34aa6315c0f53d6))
+* **quickjs:** add default `subagent` bridge ([#3850](https://github.com/pareshdashore19-cool/Deepagent/issues/3850)) ([85fd7c2](https://github.com/pareshdashore19-cool/Deepagent/commit/85fd7c283da6744e403a01861e17e99e13e0f481))
+* **quickjs:** add REPL persistence modes ([#3557](https://github.com/pareshdashore19-cool/Deepagent/issues/3557)) ([0cda6f3](https://github.com/pareshdashore19-cool/Deepagent/commit/0cda6f3ab28bc83cd16ec9fcc48229bdf6f2dc1a))
+* **quickjs:** prompt tuning on task global ([#4066](https://github.com/pareshdashore19-cool/Deepagent/issues/4066)) ([a47696f](https://github.com/pareshdashore19-cool/Deepagent/commit/a47696f6d3e57eccb5ea19fb344305a7995ecc76))
+* **quickjs:** upgrade to 0.2.0 quickjs-rs ([#4067](https://github.com/pareshdashore19-cool/Deepagent/issues/4067)) ([4ffea88](https://github.com/pareshdashore19-cool/Deepagent/commit/4ffea88690418207b5e4fa800ee8c1abfa454bec))
+* **sdk:** surface subagents via inherited lc_agent_name projection ([#3644](https://github.com/pareshdashore19-cool/Deepagent/issues/3644)) ([e0a1ed2](https://github.com/pareshdashore19-cool/Deepagent/commit/e0a1ed24e6b44c31d0aac3358aeee0d6cb66b2c4))
+
+
+### Bug Fixes
+
+* **quickjs:** ensure top-level title on subagent response schemas ([#4155](https://github.com/pareshdashore19-cool/Deepagent/issues/4155)) ([08f917e](https://github.com/pareshdashore19-cool/Deepagent/commit/08f917eea79513e7e894731f884e738c2d30383f))
+* **quickjs:** normalize nested `undefined` tool args ([#3935](https://github.com/pareshdashore19-cool/Deepagent/issues/3935)) ([1b461a0](https://github.com/pareshdashore19-cool/Deepagent/commit/1b461a0d6c6a7a6d323db18505596fcce4326b92))
+* **quickjs:** persist top-level JS declarations across evals ([#4147](https://github.com/pareshdashore19-cool/Deepagent/issues/4147)) ([7574fea](https://github.com/pareshdashore19-cool/Deepagent/commit/7574fea88b51c77f7afa8279c4f561d6ecb47e3f))
+* **quickjs:** ptc tools in tools namespace are rendered without prepended `tools.` in system prompt and task as ptc duplicated task global ([#4075](https://github.com/pareshdashore19-cool/Deepagent/issues/4075)) ([014a903](https://github.com/pareshdashore19-cool/Deepagent/commit/014a9033af70b5b8b08ad2eb36f98590f5f1cca8))
+* **quickjs:** remove `skills_backend` ([#3843](https://github.com/pareshdashore19-cool/Deepagent/issues/3843)) ([1159e50](https://github.com/pareshdashore19-cool/Deepagent/commit/1159e504abaeec4f81d5e777ecde6a6cee641edb))
+* **quickjs:** swarm subagent doesn't allow configuring middleware ([#3757](https://github.com/pareshdashore19-cool/Deepagent/issues/3757)) ([3394a9d](https://github.com/pareshdashore19-cool/Deepagent/commit/3394a9d9c7c89c0a28fa1328c9f6bae68a83ff14))
+
 ## [0.3.2](https://github.com/langchain-ai/deepagents/compare/langchain-quickjs==0.3.1...langchain-quickjs==0.3.2) (2026-06-25)
 
 ### Features
