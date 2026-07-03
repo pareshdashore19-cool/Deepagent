@@ -2,6 +2,13 @@
 
 # Changelog
 
+## [0.0.8](https://github.com/pareshdashore19-cool/Deepagent/compare/langchain-daytona==0.0.7...langchain-daytona==0.0.8) (2026-07-03)
+
+
+### Features
+
+* **sdk:** surface subagents via inherited lc_agent_name projection ([#3644](https://github.com/pareshdashore19-cool/Deepagent/issues/3644)) ([e0a1ed2](https://github.com/pareshdashore19-cool/Deepagent/commit/e0a1ed24e6b44c31d0aac3358aeee0d6cb66b2c4))
+
 ## [0.0.7](https://github.com/langchain-ai/deepagents/compare/langchain-daytona==0.0.6...langchain-daytona==0.0.7) (2026-06-03)
 
 * Version bumps
